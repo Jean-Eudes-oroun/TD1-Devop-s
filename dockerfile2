@@ -1,0 +1,32 @@
+
+FROM node:22 AS build
+RUN groupadd -r appgroup && useradd -r -g appgroup -m appuser
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npx tsc
+
+
+FROM node:22 AS production
+RUN groupadd -r appgroup && useradd -r -g appgroup -m appuser
+WORKDIR /app
+
+# Copier uniquement les fichiers nécessaires du conteneur de build (build et package.json)
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/build ./build
+
+# Installer les dépendances de production uniquement
+RUN npm install --production
+
+# Changer les droits d'accès pour l'utilisateur non privilégié
+RUN chown -R appuser:appgroup /app
+
+# Exposer le port de l'application
+EXPOSE 3000
+
+# Passer à l'utilisateur non privilégié
+USER appuser
+
+# Définir la commande pour démarrer l'application
+CMD ["node", "build/index.js"]
